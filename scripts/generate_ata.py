@@ -30,7 +30,7 @@ Gere uma ATA clara e estruturada:
 - Use uma linguagem formal e objetiva.
 - Não precisa enviar "Elaborado por"
 
-Inclua a data da reunião e um título "ATA DA REUNIÃO - DD/MM/AAAA", usando a data de {weekly_date}
+Inclua a data da reunião e um título "ATA DA REUNIÃO SEMANAL - DD/MM/AAAA", usando a data de {weekly_date}
 
 Transcrição:
 {conversation}
