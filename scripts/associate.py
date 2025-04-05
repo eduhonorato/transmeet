@@ -6,6 +6,7 @@ from collections import defaultdict
 
 base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 logs_dir = os.path.join(base_dir, "files", "logs")
+json_dir = os.path.join(base_dir, "files", "json")
 
 json_files = sorted([f for f in os.listdir(json_dir) if f.startswith("transcription_") and f.endswith(".json")], reverse=True)
 if not json_files:
