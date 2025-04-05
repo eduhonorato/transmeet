@@ -156,12 +156,40 @@ client.on("messageCreate", async (message) => {
               
                 const latestAta = ataFiles.sort().reverse()[0];
                 const ataContent = fs.readFileSync(path.join(ataDir, latestAta), "utf-8");
+                
+                function splitMessage(text, limit = 2000) {
+                  const parts = [];
+                  let remainder = text;
+
+                  while (remainder.length > limit) {
+                    let cut = remainder.lastIndexOf(" ", limit);
+
+                    if (cut === 1) cut = limit;
+
+                    const part = remainder.slice(0, cut);
+                    parts.push(part.trim());
+
+                    remainder = remainder.slice(cut).trim();
+                  }
+
+                  if (remainder.length > 0) {
+                    parts.push(remainder)
+                  }
+
+                  return parts;
+                }
               
                 try {
                   const targetChannel = await client.channels.fetch(CHANNEL_ID_TO_SEND_ATA);
                   if (targetChannel && targetChannel.send) {
-                    await targetChannel.send(`📄 **ATA DA REUNIÃO**\n\n${ataContent}`);
-                    console.log("📤 ATA enviada para o canal do Discord!");
+                    if (targetChannel && targetChannel.send) {
+                      const parts = splitMessage(ataContent);
+                  
+                      for (let i = 0; i < parts.length; i++) {
+                        const prefix = i === 0 ? "📄 **ATA DA REUNIÃO**\n\n" : "**CONTINUAÇÃO**\n\n";
+                        await targetChannel.send(`${prefix}${parts[i]}`);
+                      }
+                    }
                   } else {
                     console.error("❌ Canal de texto inválido para envio da ATA!");
                   }
