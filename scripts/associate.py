@@ -43,45 +43,44 @@ for line in log_lines:
         })
 
 windows = []
-for i in range(0, len(speaker_windows) - 1, 2):
-    if speaker_windows[i]["event"] == "START" and speaker_windows[i+1]["event"] == "END":
+active_starts = defaultdict(list)
+for event in speaker_windows:
+    if event["event"] == "START":
+        active_starts[event["username"]].append(event["time"])
+    elif event["event"] == "END" and active_starts[event["username"]]:
+        start_time = active_starts[event["username"]].pop(0)
         windows.append({
-            "username": speaker_windows[i]["username"],
-            "start": speaker_windows[i]["time"],
-            "end": speaker_windows[i+1]["time"]
+            "username": event["username"],
+            "start": start_time,
+            "end": event["time"]
         })
 
-try:
-    output_dir = os.path.join(base_dir, "files", "outputs")
-    os.makedirs(output_dir, exist_ok=True)
+output_dir = os.path.join(base_dir, "files", "outputs")
+os.makedirs(output_dir, exist_ok=True)
+timestamp = int(time.time())
+output_path = os.path.join(output_dir, f"output_{timestamp}.txt")
 
-    timestamp = int(time.time())
-    output_path = os.path.join(output_dir, f"output_{timestamp}.txt")
-    
+try:
     with open(output_path, "w", encoding="utf-8") as f:
+        last_speaker = "Desconhecido"
         for segment in transcription.get("segments", []):
             start = segment.get("start", 0)
             end = segment.get("end", 0)
             text = segment.get("text", "")
+            mid_time = (start + end) / 2
             speaker = "Desconhecido"
 
-            overlaps = defaultdict(float)
             for window in windows:
-                overlap_start = max(start, window["start"])
-                overlap_end = min(end, window["end"])
-                overlap = max(0.0, overlap_end - overlap_start)
-                if overlap > 0:
-                    overlaps[window["username"]] += overlap
+                if window["start"] <= mid_time <= window["end"]:
+                    speaker = window["username"]
+                    last_speaker = speaker
+                    break
+            else:
+                speaker = last_speaker
 
-            if overlaps:
-                speaker = max(overlaps, key=overlaps.get)
             f.write(f"{speaker}: {text.strip()}\n")
-            
-    if os.path.exists(output_path):
-        print(f"✅ Texto associado salvo em: {output_path}")
-    else:
-        print(f"❌ Arquivo não foi criado: {output_path}")
-        
+
+    print(f"✅ Texto associado salvo em: {output_path}")
 except Exception as e:
     print(f"❌ Erro ao salvar o arquivo de associação: {str(e)}")
     import traceback
