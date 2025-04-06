@@ -27,6 +27,7 @@ Gere uma ATA clara e estruturada:
 - Liste os participantes.
 - Organize os tópicos falados por pessoa (ex: "Fulano comentou sobre X...").
 - Destaque decisões tomadas e ações atribuídas (ex: "Ciclano ficará responsável por Y").
+- Informe também falas que podem agregar valor a nível de "memória de projeto"
 - Use uma linguagem formal e objetiva.
 - Não precisa enviar "Elaborado por"
 
@@ -44,7 +45,7 @@ response = client.chat.completions.create(
         {"role": "user", "content": prompt}
     ],
     temperature=0.4,
-    max_tokens=1500
+    # max_tokens=1500
 )
 
 ata = response.choices[0].message.content
