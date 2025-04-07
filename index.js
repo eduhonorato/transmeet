@@ -95,13 +95,13 @@ client.on("messageCreate", async (message) => {
     outStream.on("finish", () => {
       console.log(`✅ Arquivo de áudio salvo: ${filename}`);
 
-      console.log("🔄 Convertendo para WAV...");
-      const wavDir = path.join(__dirname, "files", "wavAudios");
-      if (!fs.existsSync(wavDir)) fs.mkdirSync(wavDir, { recursive: true });
+      console.log("🔄 Convertendo para M4A...");
+      const m4aDir = path.join(__dirname, "files", "m4aAudios");
+      if (!fs.existsSync(m4aDir)) fs.mkdirSync(m4aDir, { recursive: true });
 
-      const wavFilename = path.join(wavDir, path.basename(filename).replace(".pcm", ".wav"));
+      const m4aFilename = path.join(m4aDir, path.basename(filename).replace(".pcm", ".m4a"));
 
-      const convertProcess = spawnSync("python", ["./scripts/convert.py", filename, wavFilename], {
+      const convertProcess = spawnSync("python", ["./scripts/convert.py", filename, m4aFilename], {
         stdio: "inherit",
       });
 
@@ -111,7 +111,7 @@ client.on("messageCreate", async (message) => {
         console.log("✅ Conversão concluída!");
 
         console.log("✍️ Transcrevendo áudio...");
-        const transcribeProcess = spawnSync("python", ["./scripts/transcribe.py", wavFilename], {
+        const transcribeProcess = spawnSync("python", ["./scripts/transcribe.py", m4aFilename], {
           stdio: "inherit",
         });
 
@@ -160,41 +160,39 @@ client.on("messageCreate", async (message) => {
                 function splitMessage(text, limit = 2000) {
                   const parts = [];
                   let remainder = text;
-
-                  while (remainder.length > limit) {
-                    let cut = remainder.lastIndexOf(" ", limit);
-
-                    if (cut === 1) cut = limit;
-
-                    const part = remainder.slice(0, cut);
-                    parts.push(part.trim());
-
+                
+                  while (remainder.length > 0) {
+                    const prefix = parts.length === 0 ? "📄 **ATA DA REUNIÃO**\n\n" : "**CONTINUAÇÃO**\n\n";
+                    const maxContentLength = limit - prefix.length;
+                
+                    if (remainder.length <= maxContentLength) {
+                      parts.push(prefix + remainder);
+                      break;
+                    }
+                
+                    let cut = remainder.lastIndexOf(" ", maxContentLength);
+                    if (cut === -1) cut = maxContentLength;
+                
+                    const chunk = remainder.slice(0, cut).trim();
+                    parts.push(prefix + chunk);
                     remainder = remainder.slice(cut).trim();
                   }
-
-                  if (remainder.length > 0) {
-                    parts.push(remainder)
-                  }
-
+                
                   return parts;
                 }
               
                 try {
                   const targetChannel = await client.channels.fetch(CHANNEL_ID_TO_SEND_ATA);
                   if (targetChannel && targetChannel.send) {
-                    if (targetChannel && targetChannel.send) {
-                      const parts = splitMessage(ataContent);
-                  
-                      for (let i = 0; i < parts.length; i++) {
-                        const prefix = i === 0 ? "📄 **ATA DA REUNIÃO**\n\n" : "**CONTINUAÇÃO**\n\n";
-                        await targetChannel.send(`${prefix}${parts[i]}`);
-                      }
+                    const parts = splitMessage(ataContent);
+                    for (const part of parts) {
+                      await targetChannel.send(part);
                     }
                   } else {
                     console.error("❌ Canal de texto inválido para envio da ATA!");
                   }
-                } catch (error) {
-                  console.error("❌ Erro ao enviar ATA:", error);
+                } catch (err) {
+                  console.error("❌ Erro ao enviar ATA:", err);
                 }
               })();
             }
@@ -208,6 +206,142 @@ client.on("messageCreate", async (message) => {
 
     connection.destroy();
     connection = null;
+  }
+
+  if (message.content === ";gerar_ata" && message.author.id !== client.user.id) {
+    console.log("🎬 Iniciando geração da ATA a partir de um arquivo .m4a...");
+  
+    const m4aAudios = path.join(__dirname, "files", "m4aAudios");
+    const files = fs.readdirSync(m4aAudios).filter(file => file.endsWith(".m4a"));
+    if (!files.length) return console.error("❌ Nenhum arquivo .m4a encontrado em wavAudios.");
+  
+    const latest = files.sort().reverse()[0];
+    const inputPath = path.join(m4aAudios, latest);
+    console.log("🎧 Arquivo encontrado:", inputPath);
+  
+    console.log("✍️ Transcrevendo áudio...");
+    const transcribeProcess = spawnSync("python", ["./scripts/transcribe.py", inputPath], { stdio: "inherit" });
+    if (transcribeProcess.error) return console.error("❌ Erro ao transcrever:", transcribeProcess.error);
+  
+    console.log("✅ Transcrição concluída!");
+  
+    console.log("🔄 Associando transcrição com logs...");
+    const associateProcess = spawnSync("python", ["./scripts/associate.py"], { stdio: "inherit" });
+    if (associateProcess.error) return console.error("❌ Erro ao associar:", associateProcess.error);
+  
+    console.log("✅ Transcrição associada!");
+  
+    console.log("🧠 Gerando ATA...");
+    const generateProcess = spawnSync("python", ["./scripts/generate_ata.py"], { stdio: "inherit" });
+    if (generateProcess.error) return console.error("❌ Erro ao gerar ATA:", generateProcess.error);
+  
+    console.log("✅ ATA gerada com sucesso!");
+  
+    const ataDir = path.join(__dirname, "files", "ata");
+    if (!fs.existsSync(ataDir)) return console.error("❌ Diretório de atas não encontrado!");
+  
+    const ataFiles = fs.readdirSync(ataDir).filter(file => file.endsWith(".txt"));
+    if (!ataFiles.length) return console.error("❌ Nenhum arquivo de ata encontrado!");
+  
+    const latestAta = ataFiles.sort().reverse()[0];
+    const ataContent = fs.readFileSync(path.join(ataDir, latestAta), "utf-8");
+  
+    function splitMessage(text, limit = 2000) {
+      const parts = [];
+      let remainder = text;
+    
+      while (remainder.length > 0) {
+        const prefix = parts.length === 0 ? "📄 **ATA DA REUNIÃO**\n\n" : "**CONTINUAÇÃO**\n\n";
+        const maxContentLength = limit - prefix.length;
+    
+        if (remainder.length <= maxContentLength) {
+          parts.push(prefix + remainder);
+          break;
+        }
+    
+        let cut = remainder.lastIndexOf(" ", maxContentLength);
+        if (cut === -1) cut = maxContentLength;
+    
+        const chunk = remainder.slice(0, cut).trim();
+        parts.push(prefix + chunk);
+        remainder = remainder.slice(cut).trim();
+      }
+    
+      return parts;
+    }    
+  
+    try {
+      const targetChannel = await client.channels.fetch(CHANNEL_ID_TO_SEND_ATA);
+      if (targetChannel && targetChannel.send) {
+        const parts = splitMessage(ataContent);
+        for (const part of parts) {
+          await targetChannel.send(part);
+        }
+      } else {
+        console.error("❌ Canal de texto inválido para envio da ATA!");
+      }
+    } catch (err) {
+      console.error("❌ Erro ao enviar ATA:", err);
+    }
+  }
+
+  if (message.content === ";enviar_ata") {
+    if (message.author.bot) return;
+
+    const ATA_DIR = path.join(__dirname, "files", "ata");
+    const latestAta = getLatestAtaPath();
+
+    if (!latestAta) {
+      await message.channel.send("❌ Nenhuma ata encontrada.");
+      return;
+    }
+
+    const ataContent = fs.readFileSync(latestAta, "utf-8");
+    function getLatestAtaPath() {
+      const files = fs.readdirSync(ATA_DIR)
+        .filter(f => f.endsWith(".txt"))
+        .sort((a, b) => fs.statSync(path.join(ATA_DIR, b)).mtime - fs.statSync(path.join(ATA_DIR, a)).mtime);
+    
+      return files.length ? path.join(ATA_DIR, files[0]) : null;
+    }
+
+    function splitMessage(text, limit = 2000) {
+      const parts = [];
+      let remainder = text;
+
+      while (remainder.length > 0) {
+        const prefix = parts.length === 0 ? "📄 **ATA DA REUNIÃO**\n\n" : "**CONTINUAÇÃO**\n\n";
+        const maxContentLength = limit - prefix.length;
+
+        if (remainder.length <= maxContentLength) {
+          parts.push(prefix + remainder);
+          break;
+        }
+
+        let cut = remainder.lastIndexOf(" ", maxContentLength);
+        if (cut === -1) cut = maxContentLength;
+
+        const chunk = remainder.slice(0, cut).trim();
+        parts.push(prefix + chunk);
+        remainder = remainder.slice(cut).trim();
+      }
+
+      return parts;
+    }
+
+    try {
+      const targetChannel = await client.channels.fetch(CHANNEL_ID_TO_SEND_ATA);
+      if (targetChannel && targetChannel.send) {
+        const parts = splitMessage(ataContent);
+        for (const part of parts) {
+          await targetChannel.send(part);
+        }
+      } else {
+        console.error("❌ Canal de texto inválido para envio da ATA!");
+      }
+    } catch (err) {
+      console.error("❌ Erro ao enviar ATA:", err);
+    }
   }
 });
 
