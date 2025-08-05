@@ -1,0 +1,14 @@
+{
+  "repositories": [
+    {
+      "name": "",
+      "github_repo": "",
+      "qdrant_collection": ""
+    },
+    {
+      "name": "",
+      "github_repo": "",
+      "qdrant_collection": ""
+    }
+  ]
+}

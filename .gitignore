@@ -5,3 +5,5 @@ files/**
 !files/**/
 
 .env
+
+repos.json
