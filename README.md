@@ -97,4 +97,8 @@ Uses `repos.json` to define GitHub repositories that serve as contextual knowled
 ### Example
 <img width="665" height="597" alt="image" src="https://github.com/user-attachments/assets/94a2ad12-b7a3-42f3-8626-f463955adcee" />
 
+## Router system and information retrieval based on the chosen collection
+<img width="778" height="207" alt="image" src="https://github.com/user-attachments/assets/2551d27c-2a80-4350-975a-e3fa48646008" />
+<img width="657" height="249" alt="image" src="https://github.com/user-attachments/assets/82e19ce4-e4ef-4937-aa62-d9ffdc81c4dd" />
+
 This architecture provides clear separation of concerns: real-time communication remains lightweight in Node.js, while CPU-intensive tasks (audio + AI) are offloaded to Python. This design makes the system extensible, modular, and adaptable to new AI workflows or integrations in the future.  
