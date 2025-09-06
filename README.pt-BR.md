@@ -58,12 +58,13 @@ O Transmeet foi projetado para ser versátil, atendendo a uma ampla gama de nece
 
 | Comando             | Descrição                                                                                             |
 | ------------------- | ----------------------------------------------------------------------------------------------------- |
-| `!join`             | Faz o bot entrar no canal de voz em que você está e iniciar o modo de conversação em tempo real.        |
+| `!join`             | Faz o bot entrar no canal de voz em que você está e iniciar o modo de transcrição apenas.             |
+| `!voicebot`         | Faz o bot entrar no canal de voz em que você está e iniciar o modo de conversação em tempo real.      |
 | `!stop`             | Desconecta o bot do canal de voz e encerra a sessão.                                                  |
-| `;ask <pergunta>`   | Faz uma pergunta para o sistema RAG. A resposta será baseada nos repositórios e reuniões indexados. |
+| `;ask <pergunta>`   | Faz uma pergunta para o sistema RAG. A resposta será baseada nos repositórios e reuniões indexados.   |
 | `!startchat`        | Ativa o modo de chatbot de texto no canal atual.                                                      |
 | `!stopchat`         | Desativa o chatbot de texto.                                                                          |
-| `;gerar_ata`        | Comando legado que gera uma ata a partir do último arquivo de áudio `.m4a` encontrado.                 |
+| `;gerar_ata`        | Comando legado que gera uma ata a partir do último arquivo de áudio `.m4a` encontrado.                |
 | `;enviar_ata`       | Envia a última ata gerada para o canal configurado.                                                   |
 
 ## Arquitetura do Projeto
