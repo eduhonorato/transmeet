@@ -58,9 +58,10 @@ Transmeet is designed to be versatile, addressing a wide range of needs.
 
 | Command             | Description                                                                                       |
 | ------------------- | ------------------------------------------------------------------------------------------------- |
-| `!join`             | Makes the bot join your current voice channel and start real-time conversation mode.              |
+| `!join`             | Makes the bot join your current voice channel and start only transcription mode.                  |
+| `!voicebot`         | Makes the bot join your current voice channel and start real-time conversation.                   |
 | `!stop`             | Disconnects the bot from the voice channel and ends the session.                                  |
-| `;ask <question>`   | Asks a question to the RAG system. The answer is based on indexed repositories and past meetings.  |
+| `;ask <question>`   | Asks a question to the RAG system. The answer is based on indexed repositories and past meetings. |
 | `!startchat`        | Enables text chatbot mode in the current channel.                                                 |
 | `!stopchat`         | Disables the text chatbot.                                                                        |
 | `;gerar_ata`        | Legacy command that generates a meeting minute from the last `.m4a` audio file found.             |
@@ -88,6 +89,12 @@ Transmeet operates with a **hybrid and modular architecture**, combining Node.js
 - **Intelligence (OpenAI / Local):** Configured to use both OpenAI models (gpt-4o-mini, gpt-5, etc.) and local models (via `localhost:1234`, compatible with LM Studio, Ollama, etc.) for tasks such as routing, embeddings, and response generation.  
 
 ### Configuration & Contextualization
-Uses `repos.json` to define GitHub repositories that serve as contextual knowledge, enabling richer responses and project-focused documentation.  
+Uses `repos.json` to define GitHub repositories that serve as contextual knowledge, enabling richer responses and project-focused documentation.
+
+## Transcription Workflow
+<img width="949" height="573" alt="image" src="https://github.com/user-attachments/assets/13d29cbf-79f0-44bc-89e6-3c71ba674a71" />
+
+### Example
+<img width="665" height="597" alt="image" src="https://github.com/user-attachments/assets/94a2ad12-b7a3-42f3-8626-f463955adcee" />
 
 This architecture provides clear separation of concerns: real-time communication remains lightweight in Node.js, while CPU-intensive tasks (audio + AI) are offloaded to Python. This design makes the system extensible, modular, and adaptable to new AI workflows or integrations in the future.  
