@@ -97,4 +97,8 @@ Utiliza repos.json para definir repositórios do GitHub que servem como conhecim
 ### Exemplo
 <img width="665" height="597" alt="image" src="https://github.com/user-attachments/assets/94a2ad12-b7a3-42f3-8626-f463955adcee" />
 
+## Sistema de roteamento e retrieval de informações com base na collection escolhida
+<img width="778" height="207" alt="image" src="https://github.com/user-attachments/assets/2551d27c-2a80-4350-975a-e3fa48646008" />
+<img width="657" height="249" alt="image" src="https://github.com/user-attachments/assets/82e19ce4-e4ef-4937-aa62-d9ffdc81c4dd" />
+
 Essa arquitetura separa as preocupações de forma clara: a comunicação em tempo real é mantida leve em Node.js, enquanto tarefas que exigem uso intensivo de CPU (áudio + IA) são transferidas para Python. Esse design torna o sistema extensível, modular e adaptável a novos fluxos de trabalho ou outras integrações de IA.
