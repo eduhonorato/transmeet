@@ -91,4 +91,10 @@ O Transmeet opera com uma arquitetura híbrida e modular, utilizando Node.js e P
 ### Configuração e Contextualização
 Utiliza repos.json para definir repositórios do GitHub que servem como conhecimento contextual, permitindo respostas mais ricas e documentação com foco no projeto.
 
+## Fluxo de Transcrição
+<img width="949" height="573" alt="image" src="https://github.com/user-attachments/assets/13d29cbf-79f0-44bc-89e6-3c71ba674a71" />
+
+### Exemplo
+<img width="665" height="597" alt="image" src="https://github.com/user-attachments/assets/94a2ad12-b7a3-42f3-8626-f463955adcee" />
+
 Essa arquitetura separa as preocupações de forma clara: a comunicação em tempo real é mantida leve em Node.js, enquanto tarefas que exigem uso intensivo de CPU (áudio + IA) são transferidas para Python. Esse design torna o sistema extensível, modular e adaptável a novos fluxos de trabalho ou outras integrações de IA.
