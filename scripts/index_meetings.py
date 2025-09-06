@@ -10,18 +10,18 @@ load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
-COLLECTION_NAME = "transmeet_meetings" 
+COLLECTION_NAME = "transmeet_meetings_local"
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-EMBEDDING_MODEL = "text-embedding-3-small"
-EMBEDDING_DIMENSION = 1536
+EMBEDDING_MODEL = "text-embedding-granite-embedding-278m-multilingual"
+EMBEDDING_DIMENSION = 768
 
 MAX_TOKENS_PER_CHUNK = 400
 tokenizer = tiktoken.get_encoding("cl100k_base")
 
 try:
     qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    openai_client = OpenAI(base_url="http://localhost:1234/v1", api_key=OPENAI_API_KEY)
 except Exception as e:
     print(f"ERROR: Failed to initialize clients: {e}")
     exit()

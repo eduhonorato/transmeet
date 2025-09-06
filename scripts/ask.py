@@ -8,6 +8,9 @@ from google.genai import types
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import *
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -17,15 +20,9 @@ QDRANT_PORT = 6333
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-EMBEDDING_MODEL = "text-embedding-3-small"
-ROUTING_MODEL = "gpt-4o-mini"
-GEMINI_LLM_MODEL = "gemini-2.0-flash"
-OPENAI_LLM_MODEL = "gpt-4o-mini"
-
 try:
     if not OPENAI_API_KEY:
         raise ValueError("A variável de ambiente OPENAI_API_KEY não foi definida.")
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
     qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
 
     if not GEMINI_API_KEY:
@@ -33,9 +30,11 @@ try:
     gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 
 except Exception as e:
-    print(f"ERRO: Falha ao inicializar os clientes ou configurar as APIs: {e}", file=sys.stderr)
+    print(json.dumps({"type": "ERROR", "payload": f"Falha ao inicializar clientes: {e}"}), flush=True)
     sys.exit(1)
 
+def send_event(event_type, payload):
+    print(json.dumps({"type": event_type, "payload": payload}), flush=True)
 
 def get_repo_configs():
     config_path = os.path.join(os.path.dirname(__file__), '..', 'repos.json')
@@ -43,7 +42,7 @@ def get_repo_configs():
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f).get('repositories', [])
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"ERRO: Não foi possível carregar ou decodificar o repos.json: {e}", file=sys.stderr)
+        send_event(f"ERRO: Não foi possível carregar ou decodificar o repos.json: {e}", {e})
         return []
 
 def route_question(question, repo_configs):
@@ -54,33 +53,42 @@ def route_question(question, repo_configs):
         for config in repo_configs
     )
     system_prompt = f"""
-        Você é um especialista em roteamento de perguntas. Sua tarefa é determinar a base de conhecimento mais relevante para a pergunta de um usuário.
+        Você é um especialista em roteamento de perguntas para uma base de conhecimento de uma empresa de software. Sua tarefa é determinar a base mais relevante para a pergunta de um usuário.
+
         As bases de conhecimento disponíveis são:
         {options_str}
-        - `none`: Se a pergunta não parece relacionada a nenhuma das opções fornecidas.
+        - `transmeet_meetings_local`: Para perguntas sobre o que foi discutido em reuniões, decisões tomadas, ou tópicos abordados. Ex: "o que foi falado na reunião sobre o projeto X?".
+        - `geral`: Para perguntas gerais sobre programação, tecnologia, ou qualquer outro tópico que não seja específico dos repositórios ou reuniões listados.
 
-        Com base na pergunta do usuário, responda APENAS com o nome da base de conhecimento mais apropriada (por exemplo, `kb_ventura_back`, `none`). Não adicione nenhum outro texto.
+        Com base na pergunta do usuário, responda APENAS com o nome da base de conhecimento mais apropriada (ex: `kb_ventura_back`, `transmeet_meetings_local`, `geral`). Não adicione nenhum outro texto.
     """
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": question},
+    ]
+
     try:
-        response = openai_client.chat.completions.create(
+        response = client.chat.completions.create(
             model=ROUTING_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": question}
-            ],
-            temperature=0.0
+            messages=messages
         )
-        return response.choices[0].message.content.strip()
+
+        choice = response.choices[0].message.content.strip()
+        if choice == 'none': choice = 'geral'
+        print(f"Roteamento escolhido pelo LLM: {choice}", file=sys.stderr)
+        return choice
+
     except Exception as e:
-        print(f"ERRO: Falha ao rotear a pergunta com o LLM: {e}", file=sys.stderr)
+        send_event(f"ERRO: Falha ao rotear a pergunta com o LLM: {e}")
         return None
 
 def get_embedding(text):
     try:
-        response = openai_client.embeddings.create(input=[text], model=EMBEDDING_MODEL)
+        response = client.embeddings.create(input=[text], model=EMBEDDING_MODEL)
         return response.data[0].embedding
     except Exception as e:
-        print(f"ERRO: Falha ao gerar embedding: {e}", file=sys.stderr)
+        send_event(f"ERRO: Falha ao gerar embedding: {e}")
         sys.exit(1)
 
 def search_qdrant(collection_name, query_embedding, limit=7):
@@ -92,7 +100,7 @@ def search_qdrant(collection_name, query_embedding, limit=7):
             with_payload=True
         )
     except Exception as e:
-        print(f"AVISO: Não foi possível buscar na coleção '{collection_name}'. Ela pode não existir. Erro: {e}")
+        send_event(f"AVISO: Não foi possível buscar na coleção '{collection_name}'. Ela pode não existir. Erro: {e}")
         return []
 
 def format_context(search_results):
@@ -136,109 +144,82 @@ def main():
     search_results = []
     question_embedding = get_embedding(question)
 
-    if chosen_collection and chosen_collection != 'none':
+    # if chosen_collection and chosen_collection != 'none':
+    #     print(f"INFO: Roteador selecionou a coleção: '{chosen_collection}'", file=sys.stderr)
+    #     print("INFO: Buscando por contexto relevante...", file=sys.stderr)
+    #     search_results = search_qdrant(chosen_collection, question_embedding)
+    # else:
+    #     print("\nINFO: O roteador não encontrou uma base específica. Ativando Camada 2: Busca Profunda.", file=sys.stderr)
+    #     collections_to_search = [config['qdrant_collection'] for config in repo_configs]
+    #     collections_to_search.append("transmeet_meetings_local")
+    #     unique_collections = list(set(collections_to_search))
+    #     print(f"INFO: Buscando em TODAS as bases de conhecimento: {unique_collections}", file=sys.stderr)
+    #     all_results = []
+    #     for collection_name in unique_collections:
+    #         print(f"INFO: Buscando na coleção '{collection_name}'...", file=sys.stderr)
+    #         results = search_qdrant(collection_name, question_embedding, limit=5)
+    #         all_results.extend(results)
+    #     if all_results:
+    #         all_results.sort(key=lambda x: x.score, reverse=True)
+    #         search_results = all_results[:10]
+
+    if chosen_collection and chosen_collection != 'geral':
         print(f"INFO: Roteador selecionou a coleção: '{chosen_collection}'", file=sys.stderr)
         print("INFO: Buscando por contexto relevante...", file=sys.stderr)
+        question_embedding = get_embedding(question)
         search_results = search_qdrant(chosen_collection, question_embedding)
+        rag_context_string = format_context(search_results)
     else:
-        print("\nINFO: O roteador não encontrou uma base específica. Ativando Camada 2: Busca Profunda.", file=sys.stderr)
-        collections_to_search = [config['qdrant_collection'] for config in repo_configs]
-        collections_to_search.append("transmeet_meetings")
-        unique_collections = list(set(collections_to_search))
-        print(f"INFO: Buscando em TODAS as bases de conhecimento: {unique_collections}", file=sys.stderr)
-        all_results = []
-        for collection_name in unique_collections:
-            print(f"INFO: Buscando na coleção '{collection_name}'...", file=sys.stderr)
-            results = search_qdrant(collection_name, question_embedding, limit=5)
-            all_results.extend(results)
-        if all_results:
-            all_results.sort(key=lambda x: x.score, reverse=True)
-            search_results = all_results[:10]
+        print("\nINFO: O roteador classificou a pergunta como 'geral'. A busca na base de conhecimento foi ignorada.", file=sys.stderr)
+        rag_context_string = "Nenhum contexto da base de conhecimento foi usado. A resposta será baseada no conhecimento geral do modelo."
 
     rag_context_string = format_context(search_results)
 
     system_prompt = "Você é um desenvolvedor de software sênior. Responda à pergunta do usuário com base no contexto fornecido, que pode incluir um histórico de conversas, trechos de código relevantes e/ou trechos de transcrições de reuniões. Seja conciso, preciso e sintetize as informações de todas as fontes fornecidas."
     
-    # system_prompt = """
-    #     Você é um desenvolvedor de software sênior e um assistente de IA. Sua tarefa é responder direta e objetivamente à pergunta do usuário.
-    #     Use o contexto fornecido (histórico da conversa, código, atas de reunião) APENAS como base para formular sua resposta final.
-    #     REGRAS IMPORTANTES:
-    #     1.  Vá direto ao ponto.
-    #     2.  NÃO faça resumos, introduções ou preâmbulos.
-    #     3.  NÃO repita o contexto ou a pergunta na sua resposta.
-    #     4.  Responda apenas o que foi perguntado.
-    # """
-
-    context_for_prompt = f"""
-        # Histórico da Conversa Anterior
-        {conversation_history if conversation_history else "Nenhum histórico de conversa anterior."}
-
-        # Contexto da Base de Conhecimento (Código e Reuniões)
-        {rag_context_string}
+    system_prompt = """
+        Você é um desenvolvedor de software sênior e um assistente de IA. Sua tarefa é responder direta e objetivamente à pergunta do usuário.
+        Use o contexto fornecido (histórico da conversa, código, atas de reunião) APENAS como base para formular sua resposta final.
+        REGRAS IMPORTANTES:
+        1.  Vá direto ao ponto.
+        2.  NÃO faça resumos, introduções ou preâmbulos.
+        3.  NÃO repita o contexto ou a pergunta na sua resposta.
+        4.  Responda apenas o que foi perguntado.
     """
 
-    final_user_prompt = f"""
-        Com base estritamente no contexto fornecido abaixo, responda à minha pergunta.
+    context_for_prompt = f"""# Histórico\n{conversation_history if conversation_history else "Nenhum."}\n\n# Contexto da Base de Conhecimento\n{rag_context_string}"""
 
-        --- INÍCIO DO CONTEXTO ---
+    final_user_prompt = f"""Use o contexto e seu plano para responder à pergunta final.
+        --- CONTEXTO ---
         {context_for_prompt}
         --- FIM DO CONTEXTO ---
-
         PERGUNTA FINAL: {question}
     """
 
-    # user_prompt = f"""
-    #     # Histórico da Conversa
-    #     {conversation_history if conversation_history else "Nenhum histórico de conversa anterior."}
+    messages_for_openai = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": final_user_prompt}
+    ]
 
-    #     # Contexto da Base de Conhecimento (Código e Reuniões)
-    #     {rag_context_string}
-
-    #     # Nova Pergunta
-    #     Com base em TODO o contexto acima, responda à seguinte pergunta: **{question}**
-    # """
-
-    answer = ""
     try:
-        print("\nINFO: Enviando requisição para o Google Gemini...", file=sys.stderr)
-        response = gemini_client.models.generate_content(
-            model=GEMINI_LLM_MODEL,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                temperature=0.4
-            ),
-            contents=final_user_prompt,
+        send_event("INFO", "Gerando resposta final...")
+        response_stream = client.chat.completions.create(
+            model=OPENAI_LLM_MODEL,
+            messages=messages_for_openai,
+            stream=True
         )
-        answer = response.text.strip()
-        # print("\n--- MODEL (via Gemini) ---\n")
 
-    except Exception as e_gemini:
-        print(f"\nAVISO: Falha ao usar a API do Gemini. Erro: {e_gemini}", file=sys.stderr)
-        print("INFO: Acionando fallback para a API da OpenAI...", file=sys.stderr)
+        for chunk in response_stream:
+            content = chunk.choices[0].delta.content
+        
+            if content:
+                send_event("ANSWER_STREAM_CHUNK", content)
 
-        try:
-            messages_for_openai = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": final_user_prompt}
-            ]
-            response = openai_client.chat.completions.create(
-                model=OPENAI_LLM_MODEL,
-                messages=messages_for_openai,
-                temperature=0.1
-            )
-            answer = response.choices[0].message.content.strip()
-            # print("\n--- RESPOSTA (via OpenAI Fallback) ---\n")
+        send_event("STREAM_END", "Success")
 
-        except Exception as e_openai:
-            print(f"\nERRO: Falha crítica. A API de fallback da OpenAI também falhou. Erro: {e_openai}", file=sys.stderr)
-            sys.exit(1)
-            
-    if answer:
-        print(answer)
-    else:
-        print("\nERRO: Não foi possível obter uma resposta de nenhum serviço de LLM.", file=sys.stderr)
+    except Exception as e_openai:
+        send_event("ERROR", f"Falha crítica no LLM final: {e_openai}")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
